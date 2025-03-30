@@ -4,12 +4,12 @@ import { mcpGetCurrentTimeTransport } from "./mcp-servers/get-current-time.js";
 import { mcpWeatherTransport } from "./mcp-servers/get-weather.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type {
+  ChatCompletionContentPartText,
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources.mjs";
 
 const model = "qwen2.5-coder:7b";
-// const model = "llama3.1:latest";
 
 const openai = new OpenAI({
   baseURL: "http://localhost:11434/v1",
@@ -60,6 +60,11 @@ const query = async (
   console.log(`[question] ${query}`);
   const messages: ChatCompletionMessageParam[] = [
     {
+      role: "system",
+      content:
+        "日本語を使用する,タグを出力しない,markdownを使用しない,簡潔に答える",
+    },
+    {
       role: "user",
       content: query,
     },
@@ -69,7 +74,6 @@ const query = async (
     model,
     messages: messages,
     tools: mcpTools.tools,
-    max_completion_tokens: 2048,
   });
 
   for (const content of response.choices) {
@@ -83,7 +87,7 @@ const query = async (
         const toolName = toolCall.function.name;
         const toolArgs = toolCall.function.arguments;
         const mcp = mcpTools.functionMap[toolName];
-        console.log(`[tool] ${toolName}`);
+        console.log(`[tool] ${toolName} ${toolArgs}`);
         if (!mcp) {
           throw new Error(`Tool ${toolName} not found`);
         }
@@ -95,16 +99,17 @@ const query = async (
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
-          content: JSON.stringify(toolResult.content) as string,
+          content: toolResult.content as Array<ChatCompletionContentPartText>,
         });
       }
 
       const response = await openai.chat.completions.create({
         model,
         messages,
-        max_completion_tokens: 2048,
+        max_completion_tokens: 512,
         stream: true,
       });
+      console.log("[answer]");
       for await (const message of response) {
         process.stdout.write(message.choices[0].delta.content!);
       }
@@ -118,7 +123,8 @@ async function main() {
     mcpWeatherTransport,
     mcpGetCurrentTimeTransport,
   ]);
-  await query(openai, mcpTools, "今日の日時と東京の天気は？");
+  await query(openai, mcpTools, "今日の北海道と沖縄の天気は？");
+  await query(openai, mcpTools, "今日は何曜日？");
   await mcpTools.close();
 }
 

@@ -11,15 +11,17 @@ server.tool("get-current-time", "現在の時刻を返す", async () => {
     content: [
       {
         type: "text",
-        text: new Date().toLocaleString("ja-JP", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-          weekday: "long",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
+        text:
+          "現在の日時:" +
+          new Date().toLocaleString("ja-JP", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            weekday: "long",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
       },
     ],
   };

@@ -39,7 +39,7 @@ server.tool(
   `指定した都道府県の天気予報を返す`,
   {
     name: z.string({
-      description: "都道府県名",
+      description: "都道府県名の漢字、一つのみ",
     }),
   },
   async ({ name: areaName }) => {
