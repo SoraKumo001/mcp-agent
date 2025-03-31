@@ -9,13 +9,6 @@ import type {
   ChatCompletionTool,
 } from "openai/resources.mjs";
 
-const model = "qwen2.5-coder:7b";
-
-const openai = new OpenAI({
-  baseURL: "http://localhost:11434/v1",
-  apiKey: "ollama",
-});
-
 const getMcpTools = async (transports: Transport[]) => {
   const tools: ChatCompletionTool[] = [];
   const functionMap: Record<string, Client> = {};
@@ -54,15 +47,15 @@ const getMcpTools = async (transports: Transport[]) => {
 
 const query = async (
   openai: OpenAI,
+  model: string,
   mcpTools: Awaited<ReturnType<typeof getMcpTools>>,
   query: string
 ) => {
-  console.log(`[question] ${query}`);
+  console.log(`\n[question] ${query}`);
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content:
-        "日本語を使用する,タグを出力しない,markdownを使用しない,簡潔に答える",
+      content: "日本語を使用する,タグを出力しない,plain/textで回答する",
     },
     {
       role: "user",
@@ -83,25 +76,27 @@ const query = async (
       content.finish_reason === "tool_calls" &&
       content.message.tool_calls
     ) {
-      for (const toolCall of content.message.tool_calls) {
-        const toolName = toolCall.function.name;
-        const toolArgs = toolCall.function.arguments;
-        const mcp = mcpTools.functionMap[toolName];
-        console.log(`[tool] ${toolName} ${toolArgs}`);
-        if (!mcp) {
-          throw new Error(`Tool ${toolName} not found`);
-        }
+      await Promise.all(
+        content.message.tool_calls.map(async (toolCall) => {
+          const toolName = toolCall.function.name;
+          const toolArgs = toolCall.function.arguments;
+          const mcp = mcpTools.functionMap[toolName];
+          console.info(`[tool] ${toolName} ${toolArgs}`);
+          if (!mcp) {
+            throw new Error(`Tool ${toolName} not found`);
+          }
 
-        const toolResult = await mcp.callTool({
-          name: toolName,
-          arguments: JSON.parse(toolArgs),
-        });
-        messages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: toolResult.content as Array<ChatCompletionContentPartText>,
-        });
-      }
+          const toolResult = await mcp.callTool({
+            name: toolName,
+            arguments: JSON.parse(toolArgs),
+          });
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: toolResult.content as Array<ChatCompletionContentPartText>,
+          });
+        })
+      );
 
       const response = await openai.chat.completions.create({
         model,
@@ -119,12 +114,18 @@ const query = async (
 };
 
 async function main() {
+  const openai = new OpenAI({
+    baseURL: "http://localhost:11434/v1",
+    apiKey: "ollama",
+  });
   const mcpTools = await getMcpTools([
     mcpWeatherTransport,
     mcpGetCurrentTimeTransport,
   ]);
-  await query(openai, mcpTools, "今日の北海道と沖縄の天気は？");
-  await query(openai, mcpTools, "今日は何曜日？");
+  const model = "qwen2.5-coder:14b";
+  await query(openai, model, mcpTools, "東京の天気は？");
+  await query(openai, model, mcpTools, "今日の北海道と沖縄の天気は？");
+  await query(openai, model, mcpTools, "今日は何曜日？");
   await mcpTools.close();
 }
 
