@@ -1,5 +1,4 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { DirectServerTransport } from "../libs/direct-transport.js";
 
 const server = new McpServer({
   name: "時間表示サーバー",
@@ -25,6 +24,4 @@ server.tool("get-current-time", "現在の時刻を返す", async () => {
   };
 });
 
-const transport = new DirectServerTransport();
-await server.connect(transport);
-export const mcpGetCurrentTimeTransport = transport.getClientTransport();
+export const TimeServer = server;

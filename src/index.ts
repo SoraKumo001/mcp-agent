@@ -1,24 +1,30 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import OpenAI from "openai";
-import { mcpGetCurrentTimeTransport } from "./mcp-servers/get-current-time.js";
-import { mcpWeatherTransport } from "./mcp-servers/get-weather.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { DirectServerTransport } from "./libs/direct-transport.js";
+import { TimeServer } from "./mcp-servers/get-current-time.js";
+import { WeatherServer } from "./mcp-servers/get-weather.js";
+
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   ChatCompletionContentPartText,
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources.mjs";
 
-const getMcpTools = async (transports: Transport[]) => {
+const getMcpTools = async (servers: McpServer[]) => {
   const tools: ChatCompletionTool[] = [];
   const functionMap: Record<string, Client> = {};
   const clients: Client[] = [];
-  for (const transport of transports) {
+  for (const server of servers) {
     const mcpClient = new Client({
       name: "mcp-client-cli",
       version: "1.0.0",
     });
-    await mcpClient.connect(transport);
+    // Connecting McpServer directly to McpClient
+    const transport = new DirectServerTransport();
+    server.connect(transport);
+    await mcpClient.connect(transport.getClientTransport());
+
     clients.push(mcpClient);
     const toolsResult = await mcpClient.listTools();
     tools.push(
@@ -70,12 +76,7 @@ const query = async (
   });
 
   for (const content of response.choices) {
-    if (content.finish_reason === "stop") {
-      console.log(content.message.content);
-    } else if (
-      content.finish_reason === "tool_calls" &&
-      content.message.tool_calls
-    ) {
+    if (content.finish_reason === "tool_calls" && content.message.tool_calls) {
       await Promise.all(
         content.message.tool_calls.map(async (toolCall) => {
           const toolName = toolCall.function.name;
@@ -109,6 +110,8 @@ const query = async (
         process.stdout.write(message.choices[0].delta.content!);
       }
       console.log();
+    } else {
+      console.log(content.message.content);
     }
   }
 };
@@ -118,13 +121,10 @@ async function main() {
     baseURL: "http://localhost:11434/v1",
     apiKey: "ollama",
   });
-  const mcpTools = await getMcpTools([
-    mcpWeatherTransport,
-    mcpGetCurrentTimeTransport,
-  ]);
+  const mcpTools = await getMcpTools([TimeServer, WeatherServer]);
   const model = "qwen2.5-coder:14b";
   await query(openai, model, mcpTools, "東京の天気は？");
-  await query(openai, model, mcpTools, "今日の北海道と沖縄の天気は？");
+  await query(openai, model, mcpTools, "今日の青森と千葉の天気は？");
   await query(openai, model, mcpTools, "今日は何曜日？");
   await mcpTools.close();
 }

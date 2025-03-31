@@ -1,6 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { DirectServerTransport } from "../libs/direct-transport.js";
 
 interface Center {
   name: string;
@@ -73,6 +72,4 @@ server.tool(
   }
 );
 
-const transport = new DirectServerTransport();
-await server.connect(transport);
-export const mcpWeatherTransport = transport.getClientTransport();
+export const WeatherServer = server;

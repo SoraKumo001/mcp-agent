@@ -20,9 +20,7 @@ export class DirectServerTransport implements Transport {
     this.clientTransport = new DirectClientTransport(this);
   }
   async start() {}
-  async close() {
-    console.log("close");
-  }
+  async close() {}
   async send(message: JSONRPCMessage) {
     this.clientTransport.onmessage?.(message);
   }
